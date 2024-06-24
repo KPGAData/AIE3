@@ -39,29 +39,41 @@ HF_TOKEN = os.environ["HF_TOKEN"]
 """
 ### 1. CREATE TEXT LOADER AND LOAD DOCUMENTS
 ### NOTE: PAY ATTENTION TO THE PATH THEY ARE IN. 
-text_loader = 
-documents = 
+text_loader = TextLoader("./data/paul_graham_essays.txt")
+documents = text_loader.load()
 
 ### 2. CREATE TEXT SPLITTER AND SPLIT DOCUMENTS
-text_splitter = 
-split_documents = 
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=25)
+split_documents = text_splitter.split_documents(documents)
 
 ### 3. LOAD HUGGINGFACE EMBEDDINGS
-hf_embeddings = 
+hf_embeddings = HuggingFaceEndpointEmbeddings(
+    model=HF_EMBED_ENDPOINT,
+    task="feature-extraction",
+    huggingfacehub_api_token=HF_TOKEN,
+)
 
-if os.path.exists("./data/vectorstore"):
+VECTOR_STORE_LOCATION = "./data/vectorstore"
+
+if os.path.exists(VECTOR_STORE_LOCATION):
     vectorstore = FAISS.load_local(
-        "./data/vectorstore", 
+        VECTOR_STORE_LOCATION,
         hf_embeddings, 
         allow_dangerous_deserialization=True # this is necessary to load the vectorstore from disk as it's stored as a `.pkl` file.
     )
     hf_retriever = vectorstore.as_retriever()
-    print("Loaded Vectorstore")
+    print("Loaded Vectorstore at " + VECTOR_STORE_LOCATION)
 else:
     print("Indexing Files")
-    os.makedirs("./data/vectorstore", exist_ok=True)
+    os.makedirs(VECTOR_STORE_LOCATION, exist_ok=True)
     ### 4. INDEX FILES
     ### NOTE: REMEMBER TO BATCH THE DOCUMENTS WITH MAXIMUM BATCH SIZE = 32
+    for i in range(0, len(split_documents), 32):
+        if i==0:
+            vectorstore = FAISS.from_documents(split_documents[i:i+32], hf_embeddings)
+            continue
+        vectorstore.add_documents(split_documents[i:i+32])
+    vectorstore.save_local(VECTOR_STORE_LOCATION)
 
 hf_retriever = vectorstore.as_retriever()
 
@@ -71,17 +83,37 @@ hf_retriever = vectorstore.as_retriever()
 2. Create a Prompt Template from the String Template
 """
 ### 1. DEFINE STRING TEMPLATE
-RAG_PROMPT_TEMPLATE = 
+RAG_PROMPT_TEMPLATE = """\
+<|start_header_id|>system<|end_header_id|>
+You are a helpful assistant. You answer user questions based on provided context. If you can't answer the question with the provided context, say you don't know.<|eot_id|>
+
+<|start_header_id|>user<|end_header_id|>
+User Query:
+{query}
+
+Context:
+{context}<|eot_id|>
+
+<|start_header_id|>assistant<|end_header_id|>
+"""
 
 ### 2. CREATE PROMPT TEMPLATE
-rag_prompt =
+rag_prompt = PromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
 
 # -- GENERATION -- #
 """
 1. Create a HuggingFaceEndpoint for the LLM
 """
 ### 1. CREATE HUGGINGFACE ENDPOINT FOR LLM
-hf_llm = 
+hf_llm = HuggingFaceEndpoint(
+    endpoint_url=HF_LLM_ENDPOINT,
+    max_new_tokens=512,
+    top_k=10,
+    top_p=0.95,
+    temperature=0.3,
+    repetition_penalty=1.15,
+    huggingfacehub_api_token=HF_TOKEN,
+)
 
 @cl.author_rename
 def rename(original_author: str):
@@ -91,7 +123,7 @@ def rename(original_author: str):
     In this case, we're overriding the 'Assistant' author to be 'Paul Graham Essay Bot'.
     """
     rename_dict = {
-        "Assistant" : "Paul Graham Essay Bot"
+        "Assistant" : "Paul Graham Essays Bot"
     }
     return rename_dict.get(original_author, original_author)
 
@@ -106,7 +138,10 @@ async def start_chat():
     """
 
     ### BUILD LCEL RAG CHAIN THAT ONLY RETURNS TEXT
-    lcel_rag_chain = 
+    lcel_rag_chain = (
+        {"context": itemgetter("query") | hf_retriever, "query": itemgetter("query")}
+        | rag_prompt | hf_llm
+    )
 
     cl.user_session.set("lcel_rag_chain", lcel_rag_chain)
 
