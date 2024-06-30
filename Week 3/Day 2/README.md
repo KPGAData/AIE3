@@ -13,7 +13,11 @@
 
 # Build 🏗️
 
+<<<<<<< HEAD
 Run the notebook ([Colab link](https://colab.research.google.com/drive/1CKkGGcxSqY4iHXHK_GE5EnGVBCMpZ0yV?usp=sharing)) and complete the contained tasks:
+=======
+Run the notebook ([Colab link](https://colab.research.google.com/drive/1tWs1qiz2wbbzfYL7HsPKIA4uQhsZE9jc?usp=sharing)) and complete the contained tasks:
+>>>>>>> 1d9872c (Week 3 Day 2 Release Assignment)
 
 - 🤝 Breakout Room #1:
   1. Install required libraries
@@ -33,4 +37,8 @@ Run the notebook ([Colab link](https://colab.research.google.com/drive/1CKkGGcxS
 - Walk through your notebook and explain what you've completed in the Loom video
 - Make a social media post about your final application and tag @AIMakerspace
 - Share 3 lessons learned
+<<<<<<< HEAD
 - Share 3 lessons not learned
+=======
+- Share 3 lessons not learned
+>>>>>>> 1d9872c (Week 3 Day 2 Release Assignment)
